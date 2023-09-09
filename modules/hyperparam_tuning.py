@@ -1,9 +1,9 @@
-from hyperopt import fmin, hp, tpe, Trials, space_eval, STATUS_OK
+from hyperopt import fmin, hp, tpe, Trials, space_eval, STATUS_OK, early_stop
 from catboost import CatBoostClassifier
 from samolet_parking_lot.modules.utils import *
 
 
-def search_best_params(X_train, X_test, y_train, y_test, max_evals=100):
+def search_best_params(X_train, X_test, y_train, y_test, max_evals=100, early_stop_steps=50):
     def objective(search_space):
         categorical_columns = X_train.select_dtypes(
             exclude=["float64", "int64"]
@@ -44,6 +44,7 @@ def search_best_params(X_train, X_test, y_train, y_test, max_evals=100):
         space=search_space,
         algo=tpe.suggest,
         max_evals=max_evals,
+        early_stop_fn=early_stop.no_progress_loss(early_stop_steps)
         # verbose=False,
     )
 

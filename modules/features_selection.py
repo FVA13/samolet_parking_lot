@@ -72,13 +72,14 @@ def get_features_importance_rand_feaut(X_train, y_train, X_valid, y_valid):
 
 
 def get_random_feat_important_features(X_train, y_train, X_valid, y_valid):
-    feat_importance = pd.DataFrame(
-        get_features_importance_rand_feaut(X_train, y_train, X_valid, y_valid)
-    )
+    feat_importance = get_features_importance_rand_feaut(X_train, y_train, X_valid, y_valid)
+    feat_importance = pd.DataFrame.from_records(
+        [feat_importance],
+    ).transpose().rename(columns={0:'AVG_Importance'})
     useful_column_indices = get_column_indices(
         X_train,
-        feat_importance.query("AVG_Importance > 0")["AVG_Importance"].index.to_list(),
-    )
+        feat_importance.query("AVG_Importance > 0 ")["AVG_Importance"].index.to_list(),)
+    return useful_column_indices
 
 
 def get_sklearn_important_features(model, X_train, X_valid, y_valid, plot=False):

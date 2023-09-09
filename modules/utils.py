@@ -6,12 +6,18 @@ from sklearn.metrics import (
     ConfusionMatrixDisplay,
     confusion_matrix,
 )
+from sklearn.model_selection import train_test_split, GroupShuffleSplit, GroupKFold
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from imblearn.over_sampling import RandomOverSampler
 import seaborn as sns
 import os
 import random
+
+
+def weighted_mean(values, weights):
+    return sum(v * w for v, w in zip(values, weights)) / sum(weights)
 
 
 def seed_everything(seed=42):
@@ -56,7 +62,9 @@ def plot_roc_curve(model, X_test, y_test):
 
 
 def plot_catboost_feature_importance(model, X):
-    categorical_columns = X.select_dtypes(exclude=["float64", "int64"]).columns.to_list()
+    categorical_columns = X.select_dtypes(
+        exclude=["float64", "int64"]
+    ).columns.to_list()
     feat_importances = model.get_feature_importance(prettified=True)
     feat_importances["feat_type"] = feat_importances["Feature Id"].apply(
         lambda x: "categorial" if x in categorical_columns else "numerical"
@@ -114,3 +122,168 @@ def get_data_feature_types(data, indices):
         data.iloc[:, indices].dtypes, columns=["dtype"]
     ).reset_index(names=["feature_name"])
     return df_feat_types
+
+
+def lists_analysis(list1, list2):
+    set1 = set(list1)
+    set2 = set(list2)
+
+    intersection = set1 & set2
+    difference1 = set1 - set2
+    difference2 = set2 - set1
+
+    intersection_count = len(intersection)
+    difference1_count = len(difference1)
+    difference2_count = len(difference2)
+
+    total_elements = len(set1.union(set2))
+
+    intersection_percent = (intersection_count / total_elements) * 100
+    difference1_percent = (difference1_count / total_elements) * 100
+    difference2_percent = (difference2_count / total_elements) * 100
+
+    return {
+        "intersection": {
+            "absolute": intersection_count,
+            "percent": round(intersection_percent, 2),
+        },
+        "difference_list1": {
+            "absolute": difference1_count,
+            "percent": round(difference1_percent, 2),
+        },
+        "difference_list2": {
+            "absolute": difference2_count,
+            "percent": round(difference2_percent, 2),
+        },
+    }
+
+
+def get_train_valid_test_split(data):
+    X = data.drop(columns=["target", "client_id", "report_date"])
+    Y = data["target"]
+
+    categorical_columns = X.select_dtypes(exclude=["float64", "int64"]).columns
+    numerical_columns = X.select_dtypes(include=["float64", "int64"]).columns
+
+    X[numerical_columns] = X[numerical_columns].fillna(0)
+    X[categorical_columns] = X[categorical_columns].astype(str)
+
+    X_train, X_valid, y_train, y_valid = train_test_split(
+        X, Y, test_size=0.33, random_state=42, shuffle=True, stratify=Y
+    )
+    X_valid, X_test, y_valid, y_test = train_test_split(
+        X_valid,
+        y_valid,
+        test_size=0.33,
+        random_state=42,
+        shuffle=True,
+        stratify=y_valid,
+    )
+
+    return X_train, X_valid, X_test, y_train, y_valid, y_test
+
+
+def get_train_valid_test_split_group(data):
+    splitter = GroupShuffleSplit(test_size=0.30, n_splits=2, random_state=7)
+    split = splitter.split(data, groups=data["client_id"])
+    train_inds, test_inds = next(split)
+
+    split = splitter.split(
+        data.iloc[test_inds], groups=data.iloc[test_inds]["client_id"]
+    )
+    valid_inds, test_inds = next(split)
+
+    train = data.iloc[train_inds]
+    valid = data.iloc[valid_inds]
+    test = data.iloc[test_inds]
+
+    X_train = train.drop(columns=["target", "client_id", "report_date"])
+    X_valid = valid.drop(columns=["target", "client_id", "report_date"])
+    X_test = test.drop(columns=["target", "client_id", "report_date"])
+
+    y_train = train["target"]
+    y_valid = valid["target"]
+    y_test = test["target"]
+
+    categorical_columns = (
+        data.drop(columns=["target", "client_id", "report_date"])
+        .select_dtypes(exclude=["float64", "int64"])
+        .columns
+    )
+    numerical_columns = (
+        data.drop(columns=["target", "client_id", "report_date"])
+        .select_dtypes(include=["float64", "int64"])
+        .columns
+    )
+    X_train[numerical_columns] = X_train[numerical_columns].fillna(0)
+    X_train[categorical_columns] = X_train[categorical_columns].astype(str)
+
+    X_valid[numerical_columns] = X_valid[numerical_columns].fillna(0)
+    X_valid[categorical_columns] = X_valid[categorical_columns].astype(str)
+
+    X_test[numerical_columns] = X_test[numerical_columns].fillna(0)
+    X_test[categorical_columns] = X_test[categorical_columns].astype(str)
+
+    return X_train, X_valid, X_test, y_train, y_valid, y_test
+
+
+def get_train_valid_test_split_group_balanced(data, groupby="client_id"):
+    X = data.drop(columns=["target", "report_date"])
+    y = data["target"]
+
+    # Assuming X is your feature set, y is your target variable and groups is the array of group labels
+    group_shuffle_split = GroupShuffleSplit(n_splits=1, test_size=0.4, random_state=42)
+    groups = X[groupby]
+
+    # First split to create train and a temporary set (test + validation)
+    for train_index, temp_index in group_shuffle_split.split(X, y, groups):
+        X_train, X_temp = X.iloc[train_index], X.iloc[temp_index]
+        y_train, y_temp = y.iloc[train_index], y.iloc[temp_index]
+
+    # Balance the training data
+    ros = RandomOverSampler(random_state=42)
+    X_train, y_train = ros.fit_resample(X_train, y_train)
+
+    # Second split to separate the temporary set into test and validation sets
+    group_shuffle_split = GroupShuffleSplit(n_splits=1, test_size=0.5, random_state=42)
+    for test_index, val_index in group_shuffle_split.split(
+        X_temp, y_temp, groups[temp_index]
+    ):
+        X_test, X_val = X_temp.iloc[test_index], X_temp.iloc[val_index]
+        y_test, y_val = y_temp.iloc[test_index], y_temp.iloc[val_index]
+
+        # Balance the test data
+        ros = RandomOverSampler(random_state=42)
+        X_test, y_test = ros.fit_resample(X_test, y_test)
+
+        # Balance the validation data
+        ros = RandomOverSampler(random_state=42)
+        X_val, y_val = ros.fit_resample(X_val, y_val)
+
+    categorical_columns = (
+        data.drop(columns=["target", "client_id", "report_date"])
+        .select_dtypes(exclude=["float64", "int64"])
+        .columns
+    )
+    numerical_columns = (
+        data.drop(columns=["target", "client_id", "report_date"])
+        .select_dtypes(include=["float64", "int64"])
+        .columns
+    )
+
+    X_train[numerical_columns] = X_train[numerical_columns].fillna(0)
+    X_train[categorical_columns] = X_train[categorical_columns].astype(str)
+
+    X_val[numerical_columns] = X_val[numerical_columns].fillna(0)
+    X_val[categorical_columns] = X_val[categorical_columns].astype(str)
+
+    X_test[numerical_columns] = X_test[numerical_columns].fillna(0)
+    X_test[categorical_columns] = X_test[categorical_columns].astype(str)
+
+    X_train, X_val, X_test = (
+        X_train.drop(columns=["client_id"]),
+        X_val.drop(columns=["client_id"]),
+        X_test.drop(columns=["client_id"]),
+    )
+
+    return X_train, X_val, X_test, y_train, y_val, y_test

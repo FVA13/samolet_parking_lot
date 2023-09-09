@@ -73,7 +73,7 @@ def get_features_importance_rand_feaut(X_train, y_train, X_valid, y_valid):
 
 def get_random_feat_important_features(X_train, y_train, X_valid, y_valid):
     feat_importance = pd.DataFrame(
-        get_features_importance_rand_feaut(X_train, y_train)
+        get_features_importance_rand_feaut(X_train, y_train, X_valid, y_valid)
     )
     useful_column_indices = get_column_indices(
         X_train,

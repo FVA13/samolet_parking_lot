@@ -2,10 +2,18 @@ from catboost import CatBoostClassifier, Pool, metrics, EFeaturesSelectionAlgori
 from samolet_parking_lot.modules.utils import *
 
 
-def catboost_model_classifier(x_train, x_test, y_train, y_test):
+def catboost_model_classifier(x_train, x_valid, y_train, y_valid):
     # categorical_features_indices = np.where(~X_train.dtypes.isin(['float64', 'int64']))[0]
+    # categorical_columns = x_train.select_dtypes(exclude=["float64", "int64"]).columns
+    # categorical_features_indices = get_column_indices(x_train, categorical_columns)
     categorical_columns = x_train.select_dtypes(exclude=["float64", "int64"]).columns
-    categorical_features_indices = get_column_indices(x_train, categorical_columns)
+    numerical_columns = x_train.select_dtypes(include=['float64', 'int64']).columns
+
+    x_train[numerical_columns] = x_train[numerical_columns].fillna(0).astype(int)
+    x_valid[numerical_columns] = x_valid[numerical_columns].fillna(0).astype(int)
+
+    x_train[categorical_columns] = x_train[categorical_columns].astype(str)
+    x_valid[categorical_columns] = x_valid[categorical_columns].astype(str)
 
     cb_model = CatBoostClassifier(
         loss_function="Logloss",
@@ -20,20 +28,20 @@ def catboost_model_classifier(x_train, x_test, y_train, y_test):
         # eval_metric=[metrics.Precision(), metrics.Recall(), metrics.F1(), metrics.TotalF1(), metrics.Accuracy()]
     )
 
-    if categorical_features_indices:
+    if categorical_columns.to_list():
         cb_model.fit(
             x_train,
             y_train,
-            eval_set=(x_test, y_test),
-            cat_features=categorical_features_indices,
+            eval_set=(x_valid, y_valid),
+            cat_features=categorical_columns.to_list(),
             plot=True,
         )
     else:
         cb_model.fit(
             x_train,
             y_train,
-            eval_set=(x_test, y_test),
-            cat_features=categorical_features_indices,
+            eval_set=(x_valid, y_valid),
+            cat_features=categorical_columns.to_list(),
             plot=True,
         )
 

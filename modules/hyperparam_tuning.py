@@ -3,7 +3,7 @@ from catboost import CatBoostClassifier
 from samolet_parking_lot.modules.utils import *
 
 
-def search_best_params(X_train, X_test, y_train, y_test):
+def search_best_params(X_train, X_test, y_train, y_test, max_evals=100):
     def objective(search_space):
         categorical_columns = X_train.select_dtypes(
             exclude=["float64", "int64"]
@@ -43,7 +43,7 @@ def search_best_params(X_train, X_test, y_train, y_test):
         fn=objective,
         space=search_space,
         algo=tpe.suggest,
-        max_evals=1000,
+        max_evals=max_evals,
         # verbose=False,
     )
 

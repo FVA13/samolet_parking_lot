@@ -85,7 +85,7 @@ def get_not_null_columns_names(df, threshold):
 
 
 def get_features_importance_rand_feat(
-    X_train, y_train, X_valid, y_valid, n_iterations=10
+        X_train, y_train, X_valid, y_valid, n_iterations=10
 ):
     # Initialize a dictionary to store accumulated feature importance
     accumulated_importance = {name: 0 for name in X_train.columns}
@@ -145,10 +145,22 @@ def get_random_feat_important_features(X_train, y_train, X_valid, y_valid):
         .transpose()
         .rename(columns={0: "AVG_Importance"})
     )
+    threshold = max(float(feat_importance[feat_importance.index == 'random']["AVG_Importance"].values), 0)
     useful_column_indices = get_column_indices(
         X_train,
-        feat_importance.query("AVG_Importance > 0 ")["AVG_Importance"].index.to_list(),
+        feat_importance.query("AVG_Importance > @threshold")["AVG_Importance"].index.to_list(),
     )
+    feat_types = get_data_feature_types(X_train, useful_column_indices)
+    logger.info(
+        "From {orig_n} feature {tr_n} were selected ({left_perc:.2f}%)."
+        "Share of 'Object' type features is: {obj_feat:.2f}%."
+        "Set Threshold is {threshold}".format(
+            orig_n=len(X_train.columns),
+            tr_n=len(useful_column_indices),
+            left_perc=len(useful_column_indices) / len(X_train.columns),
+            obj_feat=len(feat_types.query("dtype.isin(['object'])")) / len(feat_types),
+            threshold=threshold,
+        ))
     return useful_column_indices
 
 

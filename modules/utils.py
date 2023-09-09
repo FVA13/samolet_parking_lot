@@ -1,5 +1,11 @@
 import torch
-from sklearn.metrics import roc_curve, auc, roc_auc_score
+from sklearn.metrics import (
+    roc_curve,
+    auc,
+    roc_auc_score,
+    ConfusionMatrixDisplay,
+    confusion_matrix,
+)
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -49,7 +55,8 @@ def plot_roc_curve(model, X_test, y_test):
     plt.show()
 
 
-def plot_catboost_feature_importance(model, categorical_columns):
+def plot_catboost_feature_importance(model, X):
+    categorical_columns = X.select_dtypes(exclude=["float64", "int64"]).columns.to_list()
     feat_importances = model.get_feature_importance(prettified=True)
     feat_importances["feat_type"] = feat_importances["Feature Id"].apply(
         lambda x: "categorial" if x in categorical_columns else "numerical"
@@ -67,11 +74,20 @@ def plot_catboost_feature_importance(model, categorical_columns):
     plt.show()
 
 
-def plot_model_info(model, X_test, y_test, categorical_columns):
+def plot_confusion_matrix(model, X_test, y_test):
+    cm_display = ConfusionMatrixDisplay(
+        confusion_matrix(y_test, model.predict(X_test)), display_labels=[False, True]
+    )
+    cm_display.plot(cmap="Blues")
+    plt.show()
+
+
+def plot_model_info(model, X_test, y_test):
     y_pred = model.predict(X_test)
     print("ROC-AUC score is: ", roc_auc_score(y_test, y_pred))
-    plot_catboost_feature_importance(model, categorical_columns)
+    plot_catboost_feature_importance(model, X_test)
     plot_roc_curve(model, X_test, y_test)
+    plot_confusion_matrix(model, X_test, y_test)
 
 
 def plot_pca_variance(pca_model, save_to=None):

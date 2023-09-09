@@ -14,7 +14,8 @@ def create_date_features(X):
     return X
 
 
-def transform_data_for_regression(X):
+# MAKE CLASS FROM IT
+def get_transformer_data_for_regression(X):
     # "Cardinality" means the number of unique values in a column
     # Select categorical columns with relatively low cardinality (convenient but arbitrary)
     categorical_cols = [
@@ -55,3 +56,5 @@ def transform_data_for_regression(X):
             ("cat", categorical_transformer, categorical_cols),
         ]
     )
+    preprocessor.fit_transform(X)
+    return preprocessor

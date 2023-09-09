@@ -34,51 +34,107 @@ def remove_null_columns(df, threshold=0.8):
     return df[to_keep]
 
 
-def get_features_importance_rand_feaut(X_train, y_train, X_valid, y_valid):
-    # Add a random feature
-    X_train["random"] = np.random.random(size=len(X_train))
-    X_valid["random"] = np.random.random(size=len(X_valid))
+# def get_features_importance_rand_feaut(X_train, y_train, X_valid, y_valid):
+#     # Add a random feature
+#     X_train["random"] = np.random.random(size=len(X_train))
+#     X_valid["random"] = np.random.random(size=len(X_valid))
+#
+#     # Get categorical features
+#     categorical_columns = X_train.select_dtypes(exclude=['float64', 'int64']).columns
+#     categorical_features_indices = get_column_indices(X_train, categorical_columns)
+#
+#     model = CatBoostClassifier(
+#         loss_function='Logloss',
+#         random_seed=42,
+#         logging_level='Silent',
+#         max_depth=8,
+#         iterations=200,
+#         auto_class_weights='Balanced',
+#         early_stopping_rounds=20,
+#     )
+#     # Train the model
+#     model.fit(
+#         X_train,
+#         y_train,
+#         eval_set=(X_valid, y_valid),
+#         cat_features=categorical_features_indices,
+#     )
+#
+#     # Get feature importance
+#     importance = model.feature_importances_
+#
+#     # Create a dictionary that maps feature names to their importance
+#     features_importance = {
+#         name: importance for name, importance in zip(X_train.columns, importance)
+#     }
+#
+#     return features_importance
 
-    # Get categorical features
-    categorical_columns = X_train.select_dtypes(exclude=['float64', 'int64']).columns
-    categorical_features_indices = get_column_indices(X_train, categorical_columns)
 
-    model = CatBoostClassifier(
-        loss_function='Logloss',
-        random_seed=42,
-        logging_level='Silent',
-        max_depth=8,
-        iterations=200,
-        auto_class_weights='Balanced',
-        early_stopping_rounds=20,
-    )
-    # Train the model
-    model.fit(
-        X_train,
-        y_train,
-        eval_set=(X_valid, y_valid),
-        cat_features=categorical_features_indices,
-    )
+def get_features_importance_rand_feaut(
+    X_train, y_train, X_valid, y_valid, n_iterations=10
+):
+    # Initialize a dictionary to store accumulated feature importance
+    accumulated_importance = {name: 0 for name in X_train.columns}
 
-    # Get feature importance
-    importance = model.feature_importances_
+    for _ in range(n_iterations):
+        # Add a random feature
+        X_train["random"] = np.random.random(size=len(X_train))
+        X_valid["random"] = np.random.random(size=len(X_valid))
 
-    # Create a dictionary that maps feature names to their importance
+        # Get categorical features
+        categorical_columns = X_train.select_dtypes(
+            exclude=["float64", "int64"]
+        ).columns
+        categorical_features_indices = get_column_indices(X_train, categorical_columns)
+
+        model = CatBoostClassifier(
+            loss_function="Logloss",
+            random_seed=42,
+            logging_level="Silent",
+            max_depth=8,
+            iterations=200,
+            auto_class_weights="Balanced",
+            early_stopping_rounds=20,
+        )
+        # Train the model
+        model.fit(
+            X_train,
+            y_train,
+            eval_set=(X_valid, y_valid),
+            cat_features=categorical_features_indices,
+        )
+
+        # Get feature importance
+        importance = model.feature_importances_
+
+        # Accumulate feature importance
+        for name, imp in zip(X_train.columns, importance):
+            accumulated_importance[name] += imp
+
+    # Average the feature importance
     features_importance = {
-        name: importance for name, importance in zip(X_train.columns, importance)
+        name: imp / n_iterations for name, imp in accumulated_importance.items()
     }
 
     return features_importance
 
 
 def get_random_feat_important_features(X_train, y_train, X_valid, y_valid):
-    feat_importance = get_features_importance_rand_feaut(X_train, y_train, X_valid, y_valid)
-    feat_importance = pd.DataFrame.from_records(
-        [feat_importance],
-    ).transpose().rename(columns={0:'AVG_Importance'})
+    feat_importance = get_features_importance_rand_feaut(
+        X_train, y_train, X_valid, y_valid
+    )
+    feat_importance = (
+        pd.DataFrame.from_records(
+            [feat_importance],
+        )
+        .transpose()
+        .rename(columns={0: "AVG_Importance"})
+    )
     useful_column_indices = get_column_indices(
         X_train,
-        feat_importance.query("AVG_Importance > 0 ")["AVG_Importance"].index.to_list(),)
+        feat_importance.query("AVG_Importance > 0 ")["AVG_Importance"].index.to_list(),
+    )
     return useful_column_indices
 
 

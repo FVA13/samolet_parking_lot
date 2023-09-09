@@ -1,8 +1,16 @@
 from sklearn.model_selection import train_test_split
 from sklearn.inspection import permutation_importance
+from catboost import CatBoostClassifier
 import numpy as np
+import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+import logging
+from samolet_parking_lot.modules.utils import *
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
+
 
 def remove_null_columns(df, threshold=0.8):
     """
@@ -26,34 +34,81 @@ def remove_null_columns(df, threshold=0.8):
     return df[to_keep]
 
 
-def get_feature_importances(X, y, model):
+def get_features_importance_rand_feaut(X_train, y_train, X_valid, y_valid):
     # Add a random feature
-    X['random'] = np.random.random(size=len(X))
+    X_train["random"] = np.random.random(size=len(X_train))
+    X_valid["random"] = np.random.random(size=len(X_valid))
 
-    # Split the data into training and testing sets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # Get categorical features
+    categorical_columns = X_train.select_dtypes(exclude=['float64', 'int64']).columns
+    categorical_features_indices = get_column_indices(X_train, categorical_columns)
 
+    model = CatBoostClassifier(
+        loss_function='Logloss',
+        random_seed=42,
+        logging_level='Silent',
+        max_depth=8,
+        iterations=200,
+        auto_class_weights='Balanced',
+        early_stopping_rounds=20,
+    )
     # Train the model
-    model.fit(X_train, y_train)
+    model.fit(
+        X_train,
+        y_train,
+        eval_set=(X_valid, y_valid),
+        cat_features=categorical_features_indices,
+    )
 
-    # Get feature importances
-    importances = model.feature_importances_
+    # Get feature importance
+    importance = model.feature_importances_
 
-    # Create a dictionary that maps feature names to their importances
-    feature_importances = {name: importance for name, importance in zip(X.columns, importances)}
+    # Create a dictionary that maps feature names to their importance
+    features_importance = {
+        name: importance for name, importance in zip(X_train.columns, importance)
+    }
 
-    return feature_importances
+    return features_importance
 
 
-def get_ (model, X_train, X_test, y_test, plot=False):
-    perm_raw = permutation_importance(model, X_test, y_test, n_repeats=10, random_state=42, n_jobs=10)
+def get_random_feat_important_features(X_train, y_train, X_valid, y_valid):
+    feat_importance = pd.DataFrame(
+        get_features_importance_rand_feaut(X_train, y_train)
+    )
+    useful_column_indices = get_column_indices(
+        X_train,
+        feat_importance.query("AVG_Importance > 0")["AVG_Importance"].index.to_list(),
+    )
+
+
+def get_sklearn_important_features(model, X_train, X_valid, y_valid, plot=False):
+    perm_raw = permutation_importance(
+        model, X_valid, y_valid, n_repeats=10, random_state=42, n_jobs=10
+    )
     perm = (
-        pd.DataFrame(columns=['AVG_Importance', 'STD_Importance'], index=[i for i in X_train.columns])
+        pd.DataFrame(
+            columns=["AVG_Importance", "STD_Importance"],
+            index=[i for i in X_train.columns],
+        )
         .assign(AVG_Importance=perm_raw.importances_mean)
         .assign(STD_Importance=np.std(perm_raw.importances, axis=1))
-        .sort_values(by='AVG_Importance', ascending=False)
+        .sort_values(by="AVG_Importance", ascending=False)
     )
-    sns.barplot(x=perm.index, y=perm.AVG_Importance)
-    plt.xticks([])
-    plt.show()
-    useful_column_indices = get_column_indices(X_train, perm.query("AVG_Importance > 0")["AVG_Importance"].index.to_list())
+    useful_column_indices = get_column_indices(
+        X_train, perm.query("AVG_Importance > 0")["AVG_Importance"].index.to_list()
+    )
+    feat_types = get_data_feature_types(X_train, useful_column_indices)
+    logger.info(
+        "From {orig_n} feature {tr_n} were selected ({left_perc:.2f}%)."
+        "Share of 'Object' type features is: {obj_feat:.2f}%".format(
+            orig_n=len(X_train.columns),
+            tr_n=len(useful_column_indices),
+            left_perc=len(useful_column_indices) / len(X_train.columns),
+            obj_feat=len(feat_types.query("dtype.isin(['object'])")) / len(feat_types),
+        )
+    )
+    if plot:
+        sns.barplot(x=perm.index, y=perm.AVG_Importance)
+        plt.xticks([])
+        plt.show()
+    return useful_column_indices

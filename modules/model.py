@@ -7,7 +7,7 @@ def catboost_model_classifier(x_train, x_valid, y_train, y_valid):
     # categorical_columns = x_train.select_dtypes(exclude=["float64", "int64"]).columns
     # categorical_features_indices = get_column_indices(x_train, categorical_columns)
     categorical_columns = x_train.select_dtypes(exclude=["float64", "int64"]).columns
-    numerical_columns = x_train.select_dtypes(include=['float64', 'int64']).columns
+    numerical_columns = x_train.select_dtypes(include=["float64", "int64"]).columns
 
     x_train[numerical_columns] = x_train[numerical_columns].fillna(0).astype(int)
     x_valid[numerical_columns] = x_valid[numerical_columns].fillna(0).astype(int)

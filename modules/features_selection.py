@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 import logging
 from samolet_parking_lot.modules.utils import *
 
@@ -32,6 +33,18 @@ def remove_null_columns(df, threshold=0.8):
 
     # Return new DataFrame with only the columns to keep
     return df[to_keep]
+
+
+def get_not_null_columns_names(df, threshold):
+    null_counts = df.isnull().sum()  # Count the number of null values in each column
+    total_rows = df.shape[0]  # Total number of rows in the DataFrame
+    null_share = (
+            null_counts / total_rows
+    )  # Calculate the share of null values for each column
+    null_columns_indices = null_share[
+        null_share < threshold
+        ].index.tolist()  # Get the names of columns with share of nulls lower than the threshold
+    return null_columns_indices
 
 
 # def get_features_importance_rand_feaut(X_train, y_train, X_valid, y_valid):
@@ -71,13 +84,14 @@ def remove_null_columns(df, threshold=0.8):
 #     return features_importance
 
 
-def get_features_importance_rand_feaut(
+def get_features_importance_rand_feat(
     X_train, y_train, X_valid, y_valid, n_iterations=10
 ):
     # Initialize a dictionary to store accumulated feature importance
     accumulated_importance = {name: 0 for name in X_train.columns}
+    accumulated_importance["random"] = 0
 
-    for _ in range(n_iterations):
+    for _ in tqdm(range(n_iterations)):
         # Add a random feature
         X_train["random"] = np.random.random(size=len(X_train))
         X_valid["random"] = np.random.random(size=len(X_valid))
@@ -121,7 +135,7 @@ def get_features_importance_rand_feaut(
 
 
 def get_random_feat_important_features(X_train, y_train, X_valid, y_valid):
-    feat_importance = get_features_importance_rand_feaut(
+    feat_importance = get_features_importance_rand_feat(
         X_train, y_train, X_valid, y_valid
     )
     feat_importance = (

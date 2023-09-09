@@ -20,6 +20,11 @@ def weighted_mean(values, weights):
     return sum(v * w for v, w in zip(values, weights)) / sum(weights)
 
 
+def lists_intersection(lst1, lst2):
+    lst3 = [value for value in lst1 if value in lst2]
+    return lst3
+
+
 def seed_everything(seed=42):
     random.seed(seed)
     os.environ["PYTHONHASHSEED"] = str(seed)
@@ -227,6 +232,7 @@ def get_train_valid_test_split_group(data):
     return X_train, X_valid, X_test, y_train, y_valid, y_test
 
 
+# check technique one more time
 def get_train_valid_test_split_group_balanced(data, groupby="client_id"):
     X = data.drop(columns=["target", "report_date"])
     y = data["target"]

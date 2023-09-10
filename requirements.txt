@@ -1,0 +1,16 @@
+catboost==1.2
+hyperopt==0.2.7
+ipython==8.12.0
+matplotlib==3.8.0rc1
+numpy==1.25.2
+numpy==1.24.0
+pandarallel==1.6.5
+pandas==1.5.3
+plotly==5.16.1
+python_Levenshtein==0.21.1
+scikit_learn==1.2.2
+scipy==1.11.2
+seaborn==0.12.2
+shap==0.42.1
+tqdm==4.66.1
+umap_learn==0.5.3

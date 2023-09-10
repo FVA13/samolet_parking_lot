@@ -5,6 +5,7 @@ from sklearn.metrics import (
     roc_auc_score,
     ConfusionMatrixDisplay,
     confusion_matrix,
+    classification_report,
 )
 from sklearn.model_selection import train_test_split, GroupShuffleSplit, GroupKFold
 import numpy as np
@@ -95,12 +96,16 @@ def plot_confusion_matrix(model, X_test, y_test):
     plt.show()
 
 
-def plot_model_info(model, X_test, y_test):
+# add opportunity to plot w/o passing the model (and passing y_pred, y_pred_proba) instead
+def plot_model_info(model, X_test, y_test, catboost=False):
     y_pred = model.predict(X_test)
+    print("Classification report of the model\n", classification_report(y_test, y_pred))
     print("ROC-AUC score is: ", roc_auc_score(y_test, y_pred))
-    plot_catboost_feature_importance(model, X_test)
+    if catboost:
+        plot_catboost_feature_importance(model, X_test)
     plot_roc_curve(model, X_test, y_test)
     plot_confusion_matrix(model, X_test, y_test)
+    plt.show()
 
 
 def plot_pca_variance(pca_model, save_to=None):
@@ -164,7 +169,7 @@ def lists_analysis(list1, list2):
 
 
 def get_train_valid_test_split(data):
-    X = data.drop(columns=["target", "client_id", "report_date"])
+    X = data.drop(columns=["target", "report_date", "client_id", "col1454"])
     Y = data["target"]
 
     categorical_columns = X.select_dtypes(exclude=["float64", "int64"]).columns
